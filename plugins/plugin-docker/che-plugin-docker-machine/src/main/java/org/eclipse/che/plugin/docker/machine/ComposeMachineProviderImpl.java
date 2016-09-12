@@ -138,6 +138,7 @@ public class ComposeMachineProviderImpl implements ComposeMachineInstanceProvide
                                       @Named("machine.docker.machine_servers") Set<ServerConf> allMachinesServers,
                                       @Named("machine.docker.dev_machine.machine_volumes") Set<String> devMachineSystemVolumes,
                                       @Named("machine.docker.machine_volumes") Set<String> allMachinesSystemVolumes,
+                                      @Nullable @Named("machine.docker.machine_extra_volumes") String allMachinesExtraSystemVolumes,
                                       @Nullable @Named("machine.docker.machine_extra_hosts") String allMachinesExtraHosts,
                                       WorkspaceFolderPathProvider workspaceFolderPathProvider,
                                       @Named("che.machine.projects.internal.storage") String projectFolderPath,
@@ -184,16 +185,33 @@ public class ComposeMachineProviderImpl implements ComposeMachineInstanceProvide
                                                          .distinct()
                                                          .collect(Collectors.toSet());
 
+        Set<String> extraVolumes;
+        if (Strings.isNullOrEmpty(allMachinesExtraSystemVolumes)) {
+            extraVolumes = Collections.emptySet();
+        } else {
+            extraVolumes = Arrays.stream(allMachinesExtraSystemVolumes.split(";"))
+                                 .filter(s -> !s.isEmpty())
+                                 .filter(s -> !s.startsWith("/etc"))
+                                 .filter(s -> !s.startsWith("/bin"))
+                                 .collect(Collectors.toSet());
+        }
+
+
         if (SystemInfo.isWindows()) {
             allMachinesSystemVolumes = escapePaths(allMachinesSystemVolumes);
             devMachineSystemVolumes = escapePaths(devMachineSystemVolumes);
+            extraVolumes = escapePaths(extraVolumes);
         }
-        this.commonMachineSystemVolumes = new ArrayList<>(allMachinesSystemVolumes);
-        List<String> devMachineVolumes = new ArrayList<>(allMachinesSystemVolumes.size()
-                                                         + devMachineSystemVolumes.size());
-        devMachineVolumes.addAll(allMachinesSystemVolumes);
-        devMachineVolumes.addAll(devMachineSystemVolumes);
-        this.devMachineSystemVolumes = devMachineVolumes;
+
+        this.commonMachineSystemVolumes = new ArrayList<>(allMachinesSystemVolumes.size() + extraVolumes.size());
+        this.commonMachineSystemVolumes.addAll(allMachinesSystemVolumes);
+        this.commonMachineSystemVolumes.addAll(extraVolumes);
+        this.devMachineSystemVolumes = new ArrayList<>(allMachinesSystemVolumes.size()
+                                                       + devMachineSystemVolumes.size()
+                                                       + extraVolumes.size());
+        this.devMachineSystemVolumes.addAll(allMachinesSystemVolumes);
+        this.devMachineSystemVolumes.addAll(extraVolumes);
+        this.devMachineSystemVolumes.addAll(devMachineSystemVolumes);
 
         this.devMachinePortsToExpose = new ArrayList<>(allMachinesServers.size() + devMachineServers.size());
         this.commonMachinePortsToExpose = new ArrayList<>(allMachinesServers.size());
